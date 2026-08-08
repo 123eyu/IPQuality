@@ -1,5 +1,5 @@
 #!/bin/bash
-script_version="v2026-08-08"
+script_version="v2026-08-09"
 check_bash(){
 current_bash_version=$(bash --version|head -n 1|awk -F ' ' '{for (i=1; i<=NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+/) {print $i; exit}}'|cut -d . -f 1)
 if [ "$current_bash_version" = "0" ]||[ "$current_bash_version" = "1" ]||[ "$current_bash_version" = "2" ]||[ "$current_bash_version" = "3" ];then
@@ -1139,22 +1139,18 @@ show_progress_bar "$temp_info" $((40-6-${sinfo[ldatabase]}))&
 bar_pid="$!"&&disown "$bar_pid"
 trap "kill_progress_bar" RETURN
 dbip=()
+local tmpcurlarg='$CurlARG'
 if [[ $IP == *:* ]];then
-local RESPONSE=$(curl -sL -m 10 "https://db-ip.com/$IP")
-else
-local RESPONSE=$(curl $CurlARG -sL -m 10 "https://db-ip.com/$IP")
+tmpcurlarg=""
 fi
-mapfile -t results < <(echo "$RESPONSE"|awk '/<th class='\''text-center'\''>Crawler/ {flag=1; next}
-             flag && /<span class="sr-only">/ {
-                 if ($0 ~ /Yes/) print "true";
-                 else if ($0 ~ /No/) print "false";
-             }
-             /<\/tr>/ && flag {flag=0}')
-dbip[robot]="${results[0]}"
-dbip[proxy]="${results[1]}"
-dbip[abuser]="${results[2]}"
-dbip[risktext]=$(echo "$RESPONSE"|sed -n 's/.*Estimated threat level for this IP address is[[:space:]]*<span[^>]*>\([^<]*\)<.*/\1/p')
-dbip[countrycode]=$(echo "$RESPONSE"|sed -n '/<code class="language-json">/,/<\/code>/p'|sed -n 's/.*"countryCode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+local RESPONSE=$(curl $tmpcurlarg -sL -m 10 -H 'accept: */*' -H 'accept-language: en-US,en;q=0.9' -H 'content-type: text/html;charset=UTF-8' -H 'dnt: 1' -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' "https://db-ip.com/api/core/")
+local tmpurl=$(echo "$RESPONSE"|sed -n 's/.*data-api-key="\([^"]*\)".*/\1/p'|head -n 1)
+RESPONSE=$(curl $tmpcurlarg -sL -m 10 -H 'accept: */*' -H 'accept-language: en-US,en;q=0.9' -H 'content-type: text/plain;charset=UTF-8' -H 'dnt: 1' -H 'origin: https://db-ip.com' -H 'priority: u=1, i' -H 'referer: https://db-ip.com/' -H 'sec-ch-ua: "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"' -H 'sec-ch-ua-mobile: ?0' -H 'sec-ch-ua-platform: "Windows"' -H 'sec-fetch-dest: empty' -H 'sec-fetch-mode: cors' -H 'sec-fetch-site: same-site' -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' --data-raw '[["11.49","EUR"],["139.90","EUR"],["699.90","EUR"]]' "https://api.db-ip.com/v2/$tmpurl/self?convertCurrencies")
+echo "$RESPONSE"|jq . >/dev/null 2>&1||RESPONSE=""
+dbip[robot]=$(echo "$RESPONSE"|jq -r '.isCrawler')
+dbip[proxy]=$(echo "$RESPONSE"|jq -r '.isProxy')
+dbip[risktext]=$(echo "$RESPONSE"|jq -r '.threatLevel')
+dbip[countrycode]=$(echo "$RESPONSE"|jq -r '.countryCode')
 shopt -s nocasematch
 case ${dbip[risktext]} in
 "low")dbip[risk]="${sscore[low]}"
@@ -1337,7 +1333,7 @@ local result1=$(Check_DNS_1 $checkunlockurl)
 local result3=$(Check_DNS_3 $checkunlockurl)
 local resultunlocktype=$(Get_Unlock_Type $result1 $result3)
 local Ftmpresult=$(curl $CurlARG -$1 --user-agent "$UA_Browser" -sL -m 10 "https://www.tiktok.com/")
-[[ $Ftmpresult == *"Please wait..."* ]]&&Ftmpresult=$(curl $useNIC $usePROXY $xForward --user-agent "$UA_Browser" -sL -m 10 "https://www.tiktok.com/explore")
+[[ $Ftmpresult == *"Please wait..."* ]]&&Ftmpresult=$(curl $useNIC $usePROXY --user-agent "$UA_Browser" -sL -m 10 "https://www.tiktok.com/explore")
 if [[ $Ftmpresult == "curl"* ]];then
 tiktok[ustatus]="${smedia[no]}"
 tiktok[uregion]="${smedia[nodata]}"
@@ -1355,7 +1351,7 @@ tiktok[utype]="$resultunlocktype"
 return
 fi
 local STmpresult=$(curl $CurlARG -$1 --user-agent "$UA_Browser" -sL -m 10 -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9" -H "Accept-Encoding: gzip" -H "Accept-Language: en" "https://www.tiktok.com"|gunzip 2>/dev/null)
-[[ $Ftmpresult == *"Please wait..."* ]]&&STmpresult=$(curl $useNIC $usePROXY $xForward --user-agent "$UA_Browser" -sL -m 10 -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9" -H "Accept-Encoding: gzip" -H "Accept-Language: en" "https://www.tiktok.com/explore"|gunzip 2>/dev/null)
+[[ $Ftmpresult == *"Please wait..."* ]]&&STmpresult=$(curl $useNIC $usePROXY --user-agent "$UA_Browser" -sL -m 10 -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9" -H "Accept-Encoding: gzip" -H "Accept-Language: en" "https://www.tiktok.com/explore"|gunzip 2>/dev/null)
 local SRegion=$(echo $STmpresult|grep '"region":'|sed 's/.*"region"//'|cut -f2 -d'"')
 if [ -n "$SRegion" ];then
 tiktok[ustatus]="${smedia[idc]}"
@@ -1606,11 +1602,11 @@ reddit[utype]="${smedia[nodata]}"
 return
 fi
 fi
-resp=$(curl $useNIC $usePROXY $xForward -$1 $ssll -fsL --user-agent "$UA_Browser" --max-time 10 $resolve_opt --write-out '\n%{http_code}' "https://www.reddit.com/")
+resp=$(curl $useNIC $usePROXY -$1 -fsL --user-agent "$UA_Browser" --max-time 10 $resolve_opt --write-out '\n%{http_code}' "https://www.reddit.com/svc/shreddit/reddit-chat")
 http_code=$(printf '%s' "$resp"|tail -n 1|tr -d '\r')
 html=$(printf '%s' "$resp"|sed '$d')
 if [ "$http_code" = "200" ];then
-region=$(printf '%s' "$html"|tr '\n' ' '|sed -n 's/.*country="\([^"]*\)".*/\1/p'|head -n 1)
+region=$(grep -oE 'country="[^"]+"' <<<"$html"|sed -n 's/^country="\([^"]*\)"$/\1/p'|grep -m1 .)
 fi
 case "$http_code" in
 000)reddit[ustatus]="${smedia[bad]}"
